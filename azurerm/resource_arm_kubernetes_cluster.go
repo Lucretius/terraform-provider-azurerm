@@ -276,7 +276,7 @@ func resourceArmKubernetesCluster() *schema.Resource {
 						},
 						"ssh_key": {
 							Type:     schema.TypeList,
-							Required: true,
+							Optional: true,
 							ForceNew: true,
 
 							Elem: &schema.Resource{
@@ -954,21 +954,26 @@ func expandKubernetesClusterLinuxProfile(d *schema.ResourceData) *containerservi
 	adminUsername := config["admin_username"].(string)
 	linuxKeys := config["ssh_key"].([]interface{})
 
-	keyData := ""
-	if key, ok := linuxKeys[0].(map[string]interface{}); ok {
-		keyData = key["key_data"].(string)
-	}
-	sshPublicKey := containerservice.SSHPublicKey{
-		KeyData: &keyData,
-	}
+	var ssh *containerservice.SSHConfiguration
+	if linuxKeys != nil {
 
-	sshPublicKeys := []containerservice.SSHPublicKey{sshPublicKey}
+		keyData := ""
+		if key, ok := linuxKeys[0].(map[string]interface{}); ok {
+			keyData = key["key_data"].(string)
+		}
+		sshPublicKey := containerservice.SSHPublicKey{
+			KeyData: &keyData,
+		}
+
+		sshPublicKeys := []containerservice.SSHPublicKey{sshPublicKey}
+		ssh = &containerservice.SSHConfiguration{
+			PublicKeys: &sshPublicKeys,
+		}
+	}
 
 	profile := containerservice.LinuxProfile{
 		AdminUsername: &adminUsername,
-		SSH: &containerservice.SSHConfiguration{
-			PublicKeys: &sshPublicKeys,
-		},
+		SSH:           ssh,
 	}
 
 	return &profile
