@@ -49,6 +49,14 @@ resource "azurerm_key_vault" "test" {
     bypass         = "AzureServices"
   }
 
+  certificate_contacts {
+    contact {
+      name  = "Certificate Contact 1"
+      email = "cert@contact.com"
+      phone = "1234567890"
+    }
+  }
+
   tags = {
     environment = "Production"
   }
@@ -72,6 +80,8 @@ The following arguments are supported:
 * `access_policy` - (Optional) An access policy block as described below. A maximum of 16 may be declared.
     
 ~> **NOTE:** It's possible to define Key Vault Access Policies both within [the `azurerm_key_vault` resource](key_vault.html) via the `access_policy` block and by using [the `azurerm_key_vault_access_policy` resource](key_vault_access_policy.html). However it's not possible to use both methods to manage Access Policies within a KeyVault, since there'll be conflicts.
+
+* `certificate_contacts` - (Optional) A certificate contacts block as described below.
 
 * `enabled_for_deployment` - (Optional) Boolean flag to specify whether Azure Virtual Machines are permitted to retrieve certificates stored as secrets from the key vault. Defaults to `false`.
 
@@ -98,6 +108,24 @@ A `access_policy` block supports the following:
 * `key_permissions` - (Required) List of key permissions, must be one or more from the following: `backup`, `create`, `decrypt`, `delete`, `encrypt`, `get`, `import`, `list`, `purge`, `recover`, `restore`, `sign`, `unwrapKey`, `update`, `verify` and `wrapKey`.
 
 * `secret_permissions` - (Required) List of secret permissions, must be one or more from the following: `backup`, `delete`, `get`, `list`, `purge`, `recover`, `restore` and `set`.
+
+
+---
+
+A `certificate_contacts` block supports the following:
+
+* `contact` - (Required) One or more `contact` blocks as defined below.
+
+
+---
+
+A `contact` block supports the following:
+
+* `name` - (Required) The name of the certificate contact.
+
+* `email` - (Optional) The email of the certificate contact.
+
+* `phone` - (Optional) The phone number of the certificate contact.
 
 
 ---
