@@ -178,7 +178,7 @@ func resourceArmKeyVault() *schema.Resource {
 						},
 						"name": {
 							Type:     schema.TypeString,
-							Optional: true,
+							Required: true,
 						},
 					},
 				},
