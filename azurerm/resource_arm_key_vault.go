@@ -164,21 +164,29 @@ func resourceArmKeyVault() *schema.Resource {
 			},
 
 			"certificate_contacts": {
-				Type:     schema.TypeList,
+				Type:     schema.TypeSet,
 				Optional: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"email": {
-							Type:     schema.TypeString,
-							Optional: true,
-						},
-						"phone": {
-							Type:     schema.TypeString,
-							Optional: true,
-						},
-						"name": {
-							Type:     schema.TypeString,
+						"contact": {
+							Type:     schema.TypeList,
 							Required: true,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"email": {
+										Type:     schema.TypeString,
+										Optional: true,
+									},
+									"phone": {
+										Type:     schema.TypeString,
+										Optional: true,
+									},
+									"name": {
+										Type:     schema.TypeString,
+										Required: true,
+									},
+								},
+							},
 						},
 					},
 				},
@@ -297,7 +305,7 @@ func resourceArmKeyVaultCreateUpdate(d *schema.ResourceData, meta interface{}) e
 		}
 	}
 
-	contactsRaw := d.Get("certificate_contacts").([]map[string]interface{})
+	contactsRaw := d.Get("certificate_contacts").(map[string]interface{})
 	contacts := expandKeyVaultCertificateContacts(contactsRaw)
 
 	if contacts != nil {
@@ -567,18 +575,20 @@ func expandKeyVaultNetworkAcls(input []interface{}) (*keyvault.NetworkRuleSet, [
 	return &ruleSet, subnetIds
 }
 
-func expandKeyVaultCertificateContacts(input []map[string]interface{}) *kv.Contacts {
-	if len(input) == 0 {
+func expandKeyVaultCertificateContacts(input map[string]interface{}) *kv.Contacts {
+	if input == nil {
 		return nil
 	}
 
+	contactInput := input["contact"].(map[string]interface{})
 	contactList := make([]kv.Contact, 0)
 
-	for _, contactRaw := range input {
+	for _, contactRaw := range contactInput {
+
 		contact := &kv.Contact{
-			EmailAddress: utils.String(contactRaw["email"].(string)),
-			Name:         utils.String(contactRaw["name"].(string)),
-			Phone:        utils.String(contactRaw["phone"].(string)),
+			EmailAddress: utils.String(contactRaw.(map[string]string)["email"]),
+			Name:         utils.String(contactRaw.(map[string]string)["name"]),
+			Phone:        utils.String(contactRaw.(map[string]string)["phone"]),
 		}
 
 		contactList = append(contactList, *contact)
@@ -591,30 +601,29 @@ func expandKeyVaultCertificateContacts(input []map[string]interface{}) *kv.Conta
 	return output
 }
 
-func flattenKeyVaultCertificateContacts(input *kv.Contacts) []map[string]interface{} {
-	output := make([]map[string]interface{}, 0)
+func flattenKeyVaultCertificateContacts(input *kv.Contacts) map[string]interface{} {
+	output := make(map[string]interface{}, 0)
 	if input == nil {
 		return output
 	}
+	output["contact"] = make([]map[string]interface{}, 0)
 
-	if input != nil {
-		if input.ContactList != nil {
-			for _, contact := range *input.ContactList {
-				c := make(map[string]interface{})
+	if input.ContactList != nil {
+		for _, contact := range *input.ContactList {
+			c := make(map[string]interface{})
 
-				if contact.EmailAddress != nil {
-					c["email"] = *contact.EmailAddress
-				}
-
-				if contact.Phone != nil {
-					c["phone"] = *contact.Phone
-				}
-
-				if contact.Name != nil {
-					c["name"] = *contact.Name
-				}
-				output = append(output, c)
+			if contact.EmailAddress != nil {
+				c["email"] = *contact.EmailAddress
 			}
+
+			if contact.Phone != nil {
+				c["phone"] = *contact.Phone
+			}
+
+			if contact.Name != nil {
+				c["name"] = *contact.Name
+			}
+			output["contact"] = append(output["contact"].([]map[string]interface{}), c)
 		}
 	}
 
