@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"time"
 
+	kv "github.com/Azure/azure-sdk-for-go/services/keyvault/2016-10-01/keyvault"
 	"github.com/Azure/azure-sdk-for-go/services/keyvault/mgmt/2018-02-14/keyvault"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
@@ -162,6 +163,27 @@ func resourceArmKeyVault() *schema.Resource {
 				},
 			},
 
+			"certificate_contacts": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"email": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+						"phone": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+						"name": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+					},
+				},
+			},
+
 			"tags": tagsSchema(),
 		},
 	}
@@ -275,11 +297,30 @@ func resourceArmKeyVaultCreateUpdate(d *schema.ResourceData, meta interface{}) e
 		}
 	}
 
+	contactsRaw := d.Get("certificate_contacts").([]map[string]interface{})
+	contacts := expandKeyVaultCertificateContacts(contactsRaw)
+
+	if contacts != nil {
+		managementClient := meta.(*ArmClient).keyVaultManagementClient
+		if _, err = managementClient.SetCertificateContacts(ctx, *read.Properties.VaultURI, *contacts); err != nil {
+			return fmt.Errorf("Error updating certificate contacts for Key Vault %q (Resource Group %q): %+v", name, resourceGroup, err)
+		}
+
+		readContacts, err := managementClient.GetCertificateContacts(ctx, *read.Properties.VaultURI)
+
+		if err != nil {
+			return fmt.Errorf("Error retrieving Key Vault certificate contacts %q (Resource Group %q): %+v", name, resourceGroup, err)
+		}
+
+		d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(&readContacts))
+	}
+
 	return resourceArmKeyVaultRead(d, meta)
 }
 
 func resourceArmKeyVaultRead(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*ArmClient).keyVaultClient
+	managementClient := meta.(*ArmClient).keyVaultManagementClient
 	ctx := meta.(*ArmClient).StopContext
 
 	id, err := parseAzureResourceID(d.Id())
@@ -323,6 +364,14 @@ func resourceArmKeyVaultRead(d *schema.ResourceData, meta interface{}) error {
 		flattenedPolicies := azure.FlattenKeyVaultAccessPolicies(props.AccessPolicies)
 		if err := d.Set("access_policy", flattenedPolicies); err != nil {
 			return fmt.Errorf("Error setting `access_policy` for KeyVault %q: %+v", *resp.Name, err)
+		}
+
+		contactResp, err := managementClient.GetCertificateContacts(ctx, *props.VaultURI)
+		if err != nil {
+			return fmt.Errorf("Error making Read request on certificate contacts for KeyVault %q (Resource Group %q): %+v", name, resourceGroup, err)
+		}
+		if err := d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(&contactResp)); err != nil {
+			return fmt.Errorf("Error setting `certificate_contacts` for KeyVault %q: %+v", *resp.Name, err)
 		}
 	}
 
@@ -516,4 +565,58 @@ func expandKeyVaultNetworkAcls(input []interface{}) (*keyvault.NetworkRuleSet, [
 		VirtualNetworkRules: &networkRules,
 	}
 	return &ruleSet, subnetIds
+}
+
+func expandKeyVaultCertificateContacts(input []map[string]interface{}) *kv.Contacts {
+	if len(input) == 0 {
+		return nil
+	}
+
+	contactList := make([]kv.Contact, 0)
+
+	for _, contactRaw := range input {
+		contact := &kv.Contact{
+			EmailAddress: utils.String(contactRaw["email"].(string)),
+			Name:         utils.String(contactRaw["name"].(string)),
+			Phone:        utils.String(contactRaw["phone"].(string)),
+		}
+
+		contactList = append(contactList, *contact)
+	}
+
+	output := &kv.Contacts{
+		ContactList: &contactList,
+	}
+
+	return output
+}
+
+func flattenKeyVaultCertificateContacts(input *kv.Contacts) []map[string]interface{} {
+	output := make([]map[string]interface{}, 0)
+	if input == nil {
+		return output
+	}
+
+	if input != nil {
+		if input.ContactList != nil {
+			for _, contact := range *input.ContactList {
+				c := make(map[string]interface{})
+
+				if contact.EmailAddress != nil {
+					c["email"] = *contact.EmailAddress
+				}
+
+				if contact.Phone != nil {
+					c["phone"] = *contact.Phone
+				}
+
+				if contact.Name != nil {
+					c["name"] = *contact.Name
+				}
+				output = append(output, c)
+			}
+		}
+	}
+
+	return output
 }
