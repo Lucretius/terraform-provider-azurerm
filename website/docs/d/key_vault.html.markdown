@@ -47,6 +47,8 @@ The following attributes are exported:
 
 * `access_policy` - One or more `access_policy` blocks as defined below.
 
+* `certificate_contacts` - A certificate contacts block as described below.
+
 * `enabled_for_deployment` - Can Azure Virtual Machines retrieve certificates stored as secrets from the Key Vault?
 
 * `enabled_for_disk_encryption` - Can Azure Disk Encryption retrieve secrets from the Key Vault?
@@ -72,3 +74,15 @@ A `sku` block exports the following:
 * `key_permissions` - A list of key permissions applicable to this Access Policy.
 
 * `secret_permissions` - A list of secret permissions applicable to this Access Policy.
+
+`certificate_contacts` supports the following:
+
+* `contact` - (Required) One or more `contact` blocks as defined below.
+
+`contact` block supports the following:
+
+* `name` - (Required) The name of the certificate contact.
+
+* `email` - (Optional) The email of the certificate contact.
+
+* `phone` - (Optional) The phone number of the certificate contact.

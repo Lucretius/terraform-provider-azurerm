@@ -135,6 +135,35 @@ func dataSourceArmKeyVault() *schema.Resource {
 				},
 			},
 
+			"certificate_contacts": {
+				Type:     schema.TypeSet,
+				Optional: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"contact": {
+							Type:     schema.TypeList,
+							Required: true,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"email": {
+										Type:     schema.TypeString,
+										Optional: true,
+									},
+									"phone": {
+										Type:     schema.TypeString,
+										Optional: true,
+									},
+									"name": {
+										Type:     schema.TypeString,
+										Required: true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+
 			"tags": tagsForDataSourceSchema(),
 		},
 	}
@@ -142,6 +171,7 @@ func dataSourceArmKeyVault() *schema.Resource {
 
 func dataSourceArmKeyVaultRead(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*ArmClient).keyVaultClient
+	managementClient := meta.(*ArmClient).keyVaultManagementClient
 	ctx := meta.(*ArmClient).StopContext
 
 	name := d.Get("name").(string)
@@ -181,6 +211,14 @@ func dataSourceArmKeyVaultRead(d *schema.ResourceData, meta interface{}) error {
 
 		if err := d.Set("network_acls", flattenKeyVaultDataSourceNetworkAcls(props.NetworkAcls)); err != nil {
 			return fmt.Errorf("Error setting `network_acls` for KeyVault %q: %+v", *resp.Name, err)
+		}
+
+		contactResp, err := managementClient.GetCertificateContacts(ctx, *props.VaultURI)
+		if err != nil {
+			return fmt.Errorf("Error making Read request on certificate contacts for KeyVault %q (Resource Group %q): %+v", name, resourceGroup, err)
+		}
+		if err := d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(&contactResp)); err != nil {
+			return fmt.Errorf("Error setting `certificate_contacts` for KeyVault %q: %+v", *resp.Name, err)
 		}
 	}
 
