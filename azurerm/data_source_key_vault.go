@@ -137,25 +137,25 @@ func dataSourceArmKeyVault() *schema.Resource {
 
 			"certificate_contacts": {
 				Type:     schema.TypeSet,
-				Optional: true,
+				Computed: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"contact": {
 							Type:     schema.TypeList,
-							Required: true,
+							Computed: true,
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"email": {
 										Type:     schema.TypeString,
-										Optional: true,
+										Computed: true,
 									},
 									"phone": {
 										Type:     schema.TypeString,
-										Optional: true,
+										Computed: true,
 									},
 									"name": {
 										Type:     schema.TypeString,
-										Required: true,
+										Computed: true,
 									},
 								},
 							},
@@ -214,7 +214,9 @@ func dataSourceArmKeyVaultRead(d *schema.ResourceData, meta interface{}) error {
 		}
 
 		contactResp, err := managementClient.GetCertificateContacts(ctx, *props.VaultURI)
-		if err != nil {
+		if utils.ResponseWasNotFound(contactResp.Response) {
+			d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(nil))
+		} else {
 			return fmt.Errorf("Error making Read request on certificate contacts for KeyVault %q (Resource Group %q): %+v", name, resourceGroup, err)
 		}
 		if err := d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(&contactResp)); err != nil {

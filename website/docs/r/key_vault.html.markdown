@@ -83,6 +83,8 @@ The following arguments are supported:
 
 * `certificate_contacts` - (Optional) A certificate contacts block as described below.
 
+~> **NOTE:** In order to set `certificate_contacts`, `certificate_permissions` must include `managecontacts`.
+
 * `enabled_for_deployment` - (Optional) Boolean flag to specify whether Azure Virtual Machines are permitted to retrieve certificates stored as secrets from the key vault. Defaults to `false`.
 
 * `enabled_for_disk_encryption` - (Optional) Boolean flag to specify whether Azure Disk Encryption is permitted to retrieve secrets from the vault and unwrap keys. Defaults to `false`.
@@ -121,9 +123,9 @@ A `certificate_contacts` block supports the following:
 
 A `contact` block supports the following:
 
-* `name` - (Required) The name of the certificate contact.
+* `email` - (Required) The email of the certificate contact.
 
-* `email` - (Optional) The email of the certificate contact.
+* `name` - (Optional) The name of the certificate contact.
 
 * `phone` - (Optional) The phone number of the certificate contact.
 

@@ -77,12 +77,12 @@ A `sku` block exports the following:
 
 `certificate_contacts` supports the following:
 
-* `contact` - (Required) One or more `contact` blocks as defined below.
+* `contact` - One or more `contact` blocks as defined below.
 
 `contact` block supports the following:
 
-* `name` - (Required) The name of the certificate contact.
+* `name` - The name of the certificate contact.
 
-* `email` - (Optional) The email of the certificate contact.
+* `email` - The email of the certificate contact.
 
-* `phone` - (Optional) The phone number of the certificate contact.
+* `phone` - The phone number of the certificate contact.

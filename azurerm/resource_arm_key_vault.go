@@ -164,8 +164,9 @@ func resourceArmKeyVault() *schema.Resource {
 			},
 
 			"certificate_contacts": {
-				Type:     schema.TypeSet,
+				Type:     schema.TypeList,
 				Optional: true,
+				MaxItems: 1,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"contact": {
@@ -175,7 +176,7 @@ func resourceArmKeyVault() *schema.Resource {
 								Schema: map[string]*schema.Schema{
 									"email": {
 										Type:     schema.TypeString,
-										Optional: true,
+										Required: true,
 									},
 									"phone": {
 										Type:     schema.TypeString,
@@ -183,7 +184,7 @@ func resourceArmKeyVault() *schema.Resource {
 									},
 									"name": {
 										Type:     schema.TypeString,
-										Required: true,
+										Optional: true,
 									},
 								},
 							},
@@ -305,22 +306,32 @@ func resourceArmKeyVaultCreateUpdate(d *schema.ResourceData, meta interface{}) e
 		}
 	}
 
-	contactsRaw := d.Get("certificate_contacts").(map[string]interface{})
+	contactsRaw := d.Get("certificate_contacts").([]interface{})
 	contacts := expandKeyVaultCertificateContacts(contactsRaw)
 
+	managementClient := meta.(*ArmClient).keyVaultManagementClient
 	if contacts != nil {
-		managementClient := meta.(*ArmClient).keyVaultManagementClient
 		if _, err = managementClient.SetCertificateContacts(ctx, *read.Properties.VaultURI, *contacts); err != nil {
 			return fmt.Errorf("Error updating certificate contacts for Key Vault %q (Resource Group %q): %+v", name, resourceGroup, err)
 		}
-
 		readContacts, err := managementClient.GetCertificateContacts(ctx, *read.Properties.VaultURI)
 
 		if err != nil {
-			return fmt.Errorf("Error retrieving Key Vault certificate contacts %q (Resource Group %q): %+v", name, resourceGroup, err)
+			if utils.ResponseWasNotFound(readContacts.Response) {
+				d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(nil))
+			} else {
+				return fmt.Errorf("Error making Read request on certificate contacts for KeyVault %q (Resource Group %q): %+v", name, resourceGroup, err)
+			}
+		} else {
+			if err := d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(&readContacts)); err != nil {
+				return fmt.Errorf("Error setting `certificate_contacts` for KeyVault %q: %+v", *read.Name, err)
+			}
 		}
-
-		d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(&readContacts))
+	} else {
+		if _, err = managementClient.DeleteCertificateContacts(ctx, *read.Properties.VaultURI); err != nil {
+			return fmt.Errorf("Error updating certificate contacts for Key Vault %q (Resource Group %q): %+v", name, resourceGroup, err)
+		}
+		d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(nil))
 	}
 
 	return resourceArmKeyVaultRead(d, meta)
@@ -376,11 +387,17 @@ func resourceArmKeyVaultRead(d *schema.ResourceData, meta interface{}) error {
 
 		contactResp, err := managementClient.GetCertificateContacts(ctx, *props.VaultURI)
 		if err != nil {
-			return fmt.Errorf("Error making Read request on certificate contacts for KeyVault %q (Resource Group %q): %+v", name, resourceGroup, err)
+			if utils.ResponseWasNotFound(contactResp.Response) {
+				d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(nil))
+			} else {
+				return fmt.Errorf("Error making Read request on certificate contacts for KeyVault %q (Resource Group %q): %+v", name, resourceGroup, err)
+			}
+		} else {
+			if err := d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(&contactResp)); err != nil {
+				return fmt.Errorf("Error setting `certificate_contacts` for KeyVault %q: %+v", *resp.Name, err)
+			}
 		}
-		if err := d.Set("certificate_contacts", flattenKeyVaultCertificateContacts(&contactResp)); err != nil {
-			return fmt.Errorf("Error setting `certificate_contacts` for KeyVault %q: %+v", *resp.Name, err)
-		}
+
 	}
 
 	flattenAndSetTags(d, resp.Tags)
@@ -575,20 +592,21 @@ func expandKeyVaultNetworkAcls(input []interface{}) (*keyvault.NetworkRuleSet, [
 	return &ruleSet, subnetIds
 }
 
-func expandKeyVaultCertificateContacts(input map[string]interface{}) *kv.Contacts {
-	if input == nil {
+func expandKeyVaultCertificateContacts(input []interface{}) *kv.Contacts {
+	if input == nil || len(input) == 0 {
 		return nil
 	}
 
-	contactInput := input["contact"].(map[string]interface{})
+	contactInputBase := input[0]
+	contactInput := contactInputBase.(map[string]interface{})["contact"].([]interface{})
 	contactList := make([]kv.Contact, 0)
 
 	for _, contactRaw := range contactInput {
 
 		contact := &kv.Contact{
-			EmailAddress: utils.String(contactRaw.(map[string]string)["email"]),
-			Name:         utils.String(contactRaw.(map[string]string)["name"]),
-			Phone:        utils.String(contactRaw.(map[string]string)["phone"]),
+			EmailAddress: utils.String(contactRaw.(map[string]interface{})["email"].(string)),
+			Name:         utils.String(contactRaw.(map[string]interface{})["name"].(string)),
+			Phone:        utils.String(contactRaw.(map[string]interface{})["phone"].(string)),
 		}
 
 		contactList = append(contactList, *contact)
@@ -601,12 +619,14 @@ func expandKeyVaultCertificateContacts(input map[string]interface{}) *kv.Contact
 	return output
 }
 
-func flattenKeyVaultCertificateContacts(input *kv.Contacts) map[string]interface{} {
-	output := make(map[string]interface{}, 0)
+func flattenKeyVaultCertificateContacts(input *kv.Contacts) []interface{} {
 	if input == nil {
-		return output
+		return []interface{}{}
 	}
-	output["contact"] = make([]map[string]interface{}, 0)
+
+	output := make(map[string]interface{})
+
+	contacts := make([]map[string]interface{}, 0)
 
 	if input.ContactList != nil {
 		for _, contact := range *input.ContactList {
@@ -623,9 +643,11 @@ func flattenKeyVaultCertificateContacts(input *kv.Contacts) map[string]interface
 			if contact.Name != nil {
 				c["name"] = *contact.Name
 			}
-			output["contact"] = append(output["contact"].([]map[string]interface{}), c)
+			contacts = append(contacts, c)
 		}
 	}
 
-	return output
+	output["contact"] = contacts
+
+	return []interface{}{output}
 }

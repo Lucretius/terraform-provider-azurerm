@@ -222,6 +222,9 @@ func TestAccAzureRMKeyVault_complete(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testCheckAzureRMKeyVaultExists(resourceName),
 					resource.TestCheckResourceAttrSet(resourceName, "access_policy.0.application_id"),
+					resource.TestCheckResourceAttrSet(resourceName, "certificate_contacts.contact.0.name"),
+					resource.TestCheckResourceAttrSet(resourceName, "certificate_contacts.contact.0.phone"),
+					resource.TestCheckResourceAttrSet(resourceName, "certificate_contacts.contact.0.email"),
 				),
 			},
 			{
@@ -623,7 +626,8 @@ resource "azurerm_key_vault" "test" {
     application_id = "${data.azurerm_client_config.current.service_principal_application_id}"
 
     certificate_permissions = [
-      "get",
+			"get",
+			"managecontacts",
     ]
 
     key_permissions = [
@@ -633,13 +637,21 @@ resource "azurerm_key_vault" "test" {
     secret_permissions = [
       "get",
     ]
-  }
+	}
+	
+	certificate_contacts {
+		contact {
+			name = "Test%d"
+			email = "test@email%d.com"
+			phone = "1234567890"
+		}
+	}
 
   tags = {
     environment = "Production"
   }
 }
-`, rInt, location, rInt)
+`, rInt, location, rInt, rInt, rInt)
 }
 
 func testAccAzureRMKeyVault_justCert(rInt int, location string) string {
