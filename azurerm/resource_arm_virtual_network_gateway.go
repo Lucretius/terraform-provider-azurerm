@@ -152,6 +152,7 @@ func resourceArmVirtualNetworkGateway() *schema.Resource {
 						"root_certificate": {
 							Type:     schema.TypeSet,
 							Optional: true,
+							Computed: true,
 
 							ConflictsWith: []string{
 								"vpn_client_configuration.0.radius_server_address",
@@ -216,6 +217,7 @@ func resourceArmVirtualNetworkGateway() *schema.Resource {
 						"vpn_client_protocols": {
 							Type:     schema.TypeSet,
 							Optional: true,
+							Computed: true,
 							Elem: &schema.Schema{
 								Type: schema.TypeString,
 								ValidateFunc: validation.StringInSlice([]string{
